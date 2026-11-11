@@ -8,7 +8,7 @@ import {
   getSpriteKey,
   getSpritePath,
   getTimeChange,
-} from "./game.mjs";
+} from "./game.mjs?v=2";
 
 const byId = (id) => document.getElementById(id);
 const pokemonDisplayName = (pokemon) => pokemon.form ? `${pokemon.name}（${pokemon.form}）` : pokemon.name;
