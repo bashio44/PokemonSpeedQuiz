@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#111522">
+    <meta name="description" content="ポケモンの素早さ種族値を見抜いて、30秒の限界に挑戦！">
+    <title>ポケスピ！ — どっちが速い？</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./src/app.mjs"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="home-screen" class="screen home-screen" aria-labelledby="app-title">
+        <div class="brand-mark" aria-hidden="true"><span>⚡</span></div>
+        <p class="eyebrow">POKÉMON SPEED QUIZ</p>
+        <h1 id="app-title">ポケスピ！</h1>
+        <p class="home-lead">どっちが速い？<br>反射神経スピードクイズ</p>
+
+        <div class="home-card">
+          <h2>出題範囲</h2>
+          <label class="setting-row">
+            <input id="final-only" type="checkbox" checked>
+            <span class="custom-check" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>最終進化のみ</strong>
+              <small>進化先のないポケモンから出題</small>
+            </span>
+          </label>
+          <label class="setting-row">
+            <input id="regulation-only" type="checkbox" checked>
+            <span class="custom-check" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>レギュレーションM-C</strong>
+              <small>M-C対象のポケモンに限定</small>
+            </span>
+          </label>
+          <p id="pool-summary" class="pool-summary" aria-live="polite">データを読み込み中…</p>
+          <button id="start-button" class="button button-primary start-button" type="button" disabled>
+            <span>スタート</span><span aria-hidden="true">→</span>
+          </button>
+          <p id="load-error" class="load-error" role="alert" hidden></p>
+        </div>
+
+        <div class="how-to home-card">
+          <h2>あそびかた</h2>
+          <ol>
+            <li>左右のポケモンを見比べて、素早さが高い方をタップ！</li>
+            <li>正解で時間ゲット。不正解だと時間が減るよ。</li>
+            <li>問題が進むほど、ボーナスは小さく、ペナルティは大きく！</li>
+            <li>時間がなくなる前に、何問正解できるかな？</li>
+          </ol>
+          <p class="time-note"><span aria-hidden="true">⏱</span> 持ち時間は30秒。正解しても30秒が上限です。</p>
+        </div>
+        <p class="credit">データ：pokemon_data / PokeAPI　・　画像：PokeAPI Sprites</p>
+      </section>
+
+      <section id="game-screen" class="screen game-screen" aria-labelledby="game-title" hidden>
+        <header class="game-header">
+          <div class="game-topline">
+            <span class="game-brand">ポケスピ！</span>
+            <span id="question-count" class="question-count">第1問</span>
+            <span class="score-pill">正解 <strong id="score">0</strong></span>
+          </div>
+          <h1 id="game-title">すばやいのは？</h1>
+          <div class="timer-row">
+            <div class="timer-track" role="progressbar" aria-label="残り時間" aria-valuemin="0" aria-valuemax="30" aria-valuenow="30">
+              <div id="timer-fill" class="timer-fill"></div>
+            </div>
+            <span id="time-label" class="time-label">30.0<span>秒</span></span>
+          </div>
+        </header>
+
+        <div class="choice-area">
+          <button id="left-card" class="pokemon-card" type="button" aria-label="左のポケモンを選ぶ">
+            <span class="card-side-label">LEFT</span>
+            <span class="pokemon-number"></span>
+            <img class="pokemon-image" alt="" draggable="false">
+            <span class="pokemon-name"></span>
+            <span class="speed-value" aria-live="polite"></span>
+          </button>
+          <div class="versus" aria-hidden="true">VS</div>
+          <button id="right-card" class="pokemon-card" type="button" aria-label="右のポケモンを選ぶ">
+            <span class="card-side-label">RIGHT</span>
+            <span class="pokemon-number"></span>
+            <img class="pokemon-image" alt="" draggable="false">
+            <span class="pokemon-name"></span>
+            <span class="speed-value" aria-live="polite"></span>
+          </button>
+        </div>
+
+        <div id="answer-feedback" class="answer-feedback" aria-live="assertive" hidden>
+          <div id="feedback-mark" class="feedback-mark" aria-hidden="true"></div>
+          <p id="feedback-title" class="feedback-title"></p>
+          <p id="feedback-change" class="feedback-change"></p>
+        </div>
+        <p class="tap-hint">すばやさ種族値が高い方を選ぼう！</p>
+      </section>
+
+      <section id="result-screen" class="screen result-screen" aria-labelledby="result-title" hidden>
+        <header class="result-header">
+          <p class="eyebrow">TIME'S UP</p>
+          <h1 id="result-title">結果発表</h1>
+          <div class="result-poster">
+            <p class="result-caption">今回の正解数</p>
+            <p class="result-score"><strong id="final-score">0</strong><span>問</span></p>
+            <p id="result-detail" class="result-detail"></p>
+          </div>
+          <div class="result-actions">
+            <button id="share-button" class="button button-primary" type="button">結果をシェア</button>
+            <button id="retry-button" class="button button-secondary" type="button">もう一度あそぶ</button>
+          </div>
+          <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
+        </header>
+        <section class="history-section" aria-labelledby="history-title">
+          <h2 id="history-title">問題と回答</h2>
+          <p id="empty-history" class="empty-history" hidden>回答した問題はありません。次は記録更新を目指そう！</p>
+          <ol id="answer-history" class="answer-history"></ol>
+        </section>
+        <button id="home-button" class="text-button" type="button">ホームへ戻る</button>
+      </section>
+    </main>
+  </body>
+</html>
