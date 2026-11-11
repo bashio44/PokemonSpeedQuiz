@@ -3,7 +3,8 @@ import {
   applyTimeChange,
   createQuestion,
   filterPokemon,
-  getSpriteCandidates,
+  getSpriteKey,
+  getSpritePath,
   getTimeChange,
 } from "./game.mjs";
 
@@ -24,8 +25,11 @@ const feedback = byId("answer-feedback");
 
 let pokemonData = [];
 let regulationIds = [];
+let spriteIds = new Map();
 let pool = [];
 let currentPair = [];
+let nextQuestionPromise;
+const spriteCache = new Map();
 let history = [];
 let score = 0;
 let timeLeft = STARTING_TIME;
@@ -36,17 +40,22 @@ let gameActive = false;
 
 async function loadData() {
   try {
-    const [pokemonResponse, regulationResponse] = await Promise.all([
+    const [pokemonResponse, regulationResponse, spriteResponse] = await Promise.all([
       fetch("./data/pokemon.json"),
       fetch("./data/regulation-mc.json"),
+      fetch("./data/pokemon-sprites.json"),
     ]);
-    if (!pokemonResponse.ok || !regulationResponse.ok) {
+    if (!pokemonResponse.ok || !regulationResponse.ok || !spriteResponse.ok) {
       throw new Error("データファイルを読み込めませんでした。");
     }
     [pokemonData, regulationIds] = await Promise.all([
       pokemonResponse.json(),
       regulationResponse.json(),
     ]);
+    const spriteManifest = await spriteResponse.json();
+    spriteIds = new Map(
+      spriteManifest.map((pokemon) => [getSpriteKey(pokemon), pokemon.spriteId]),
+    );
     refreshPoolSummary();
   } catch (error) {
     byId("load-error").textContent = `データの読み込みに失敗しました。ページを再読み込みしてください。(${error.message})`;
@@ -86,25 +95,38 @@ function setScreen(screen) {
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-function startGame() {
+async function startGame() {
   refreshPoolSummary();
   if (startButton.disabled) return;
 
+  startButton.disabled = true;
+  startButton.querySelector("span").textContent = "画像を準備中…";
   pool = getCurrentPool();
-  history = [];
-  score = 0;
-  timeLeft = STARTING_TIME;
-  gameActive = true;
-  byId("score").textContent = "0";
-  feedback.hidden = true;
-  setScreen("game");
-  showQuestion();
-  lastFrame = performance.now();
-  animationFrame = requestAnimationFrame(updateTimer);
+  const firstQuestion = createQuestion(pool);
+
+  try {
+    await preloadQuestionImages(firstQuestion);
+    history = [];
+    score = 0;
+    timeLeft = STARTING_TIME;
+    gameActive = true;
+    byId("score").textContent = "0";
+    feedback.hidden = true;
+    setScreen("game");
+    showQuestion(firstQuestion);
+    lastFrame = performance.now();
+    animationFrame = requestAnimationFrame(updateTimer);
+  } catch (error) {
+    byId("load-error").textContent = `画像の読み込みに失敗しました。ページを再読み込みしてください。(${error.message})`;
+    byId("load-error").hidden = false;
+  } finally {
+    startButton.querySelector("span").textContent = "スタート";
+    startButton.disabled = new Set(pool.map((entry) => entry.stats.speed)).size < 2;
+  }
 }
 
-function showQuestion() {
-  currentPair = createQuestion(pool);
+function showQuestion(pair) {
+  currentPair = pair;
   byId("question-count").textContent = `第${history.length + 1}問`;
   populateCard(leftCard, currentPair[0]);
   populateCard(rightCard, currentPair[1]);
@@ -114,6 +136,7 @@ function showQuestion() {
   rightCard.classList.remove("is-correct", "is-wrong");
   feedback.hidden = true;
   updateTimerDisplay();
+  nextQuestionPromise = preloadNextQuestion();
 }
 
 function populateCard(card, pokemon) {
@@ -125,21 +148,45 @@ function populateCard(card, pokemon) {
   card.querySelector(".pokemon-name").textContent = displayName;
   card.querySelector(".speed-value").textContent = "";
   const image = card.querySelector(".pokemon-image");
-  const candidates = getSpriteCandidates(pokemon.no);
-  let index = 0;
-  image.onerror = () => {
-    index += 1;
-    if (index < candidates.length) {
-      image.src = candidates[index];
-    } else {
-      image.onerror = null;
-      image.classList.add("image-unavailable");
-      image.alt = "画像なし";
-    }
-  };
-  image.classList.remove("image-unavailable");
   image.alt = `${displayName}の画像`;
-  image.src = candidates[0];
+  image.src = getSpritePath(pokemon, spriteIds);
+}
+
+function preloadSprite(path) {
+  if (!spriteCache.has(path)) {
+    const image = new Image();
+    image.decoding = "async";
+    let loading;
+    if (typeof image.decode === "function") {
+      image.src = path;
+      loading = image.decode().then(() => image);
+    } else {
+      loading = new Promise((resolve, reject) => {
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error(`${path}を読み込めませんでした。`));
+        image.src = path;
+      });
+    }
+    const promise = loading.catch((error) => {
+      spriteCache.delete(path);
+      throw error;
+    });
+    spriteCache.set(path, promise);
+  }
+  return spriteCache.get(path);
+}
+
+function preloadQuestionImages(pair) {
+  return Promise.all(pair.map((pokemon) => preloadSprite(getSpritePath(pokemon, spriteIds))));
+}
+
+function preloadNextQuestion() {
+  const pair = createQuestion(pool);
+  return preloadQuestionImages(pair).then(() => pair).catch((error) => {
+    byId("load-error").textContent = `画像の読み込みに失敗しました。(${error.message})`;
+    byId("load-error").hidden = false;
+    return null;
+  });
 }
 
 function updateTimer(now) {
@@ -192,12 +239,21 @@ function answer(side) {
   showAnswer(isCorrect, change, correctPokemon);
   feedbackStartedAt = performance.now();
 
-  window.setTimeout(() => {
+  window.setTimeout(async () => {
     if (!gameActive) return;
     if (timeLeft <= 0) {
       endGame();
     } else {
-      showQuestion();
+      const nextQuestion = await nextQuestionPromise;
+      if (!gameActive) return;
+      if (nextQuestion) {
+        showQuestion(nextQuestion);
+      } else {
+        gameActive = false;
+        cancelAnimationFrame(animationFrame);
+        setScreen("home");
+        startButton.disabled = false;
+      }
     }
   }, 720);
 }

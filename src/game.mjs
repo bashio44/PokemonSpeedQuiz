@@ -46,12 +46,15 @@ export function applyTimeChange(currentTime, change, maximum = STARTING_TIME) {
   return Math.min(maximum, Math.max(0, currentTime + change));
 }
 
-export function getSpriteCandidates(number) {
-  const base = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions";
-  return [
-    `${base}/generation-ix/champions/${number}.webp`,
-    `${base}/generation-ix/legends-za/${number}.webp`,
-    `${base}/generation-ix/scarlet-violet/${number}.webp`,
-    `${base}/generation-viii/legends-arceus/${number}.webp`,
-  ];
+export function getSpritePath(pokemon, spriteIds) {
+  const key = getSpriteKey(pokemon);
+  const spriteId = spriteIds.get(key);
+  if (!Number.isInteger(spriteId)) {
+    throw new RangeError(`画像データがありません: ${key}`);
+  }
+  return `./assets/pokemon/${spriteId}.png`;
+}
+
+export function getSpriteKey(pokemon) {
+  return `${pokemon.no}:${pokemon.form ?? ""}:${pokemon.name}`;
 }

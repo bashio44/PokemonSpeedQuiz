@@ -23,9 +23,9 @@ node --test
 
 - 日本語名・種族値・進化情報：[`kotofurumiya/pokemon_data`](https://github.com/kotofurumiya/pokemon_data) のJSONを同梱しています。同データは全国図鑑807番までのため、808番以降の通常ポケモンは[PokeAPIのCSVデータ](https://github.com/PokeAPI/pokeapi/tree/master/data/v2/csv)から補っています。
 - レギュレーションM-C対象番号：[Pokemon Champions Helper](https://github.com/Marioarttv/PokemonChampionsHelper)が公開する2026年9月9日時点の対象名一覧をPokeAPIの全国図鑑データに照合した一覧を同梱しています。公式発表との同期ではないため、ルール更新時は公式情報を確認して `data/regulation-mc.json` を更新してください。
-- 画像：PokeAPI SpritesのChampions Frontを優先し、Legends: Z-A、Scarlet/Violet（Generation IX）、Legends: Arceusの順にフォールバックします。
+- 画像：フォーム別に照合したPokeAPI SpritesのFront画像を小さなPNGで同梱しています。ネットワークからの画像取得を待たずに表示でき、画像がないフォームは通常のすがたの画像に置き換えます。
 
-データを更新する場合は、出題データと `data/regulation-mc.json` を合わせて更新してください。画像は実行時にPokeAPI Spritesから読み込みます。
+データを更新する場合は、出題データと `data/regulation-mc.json` を合わせて更新してください。`data/pokemon-sprites.json` の対応に合わせて画像も同梱してください。画像の再取得は `node scripts/download-pokemon-sprites.mjs` で行えます。画像マニフェストと画像ファイルの対応は `node --test` で検証できます。
 
 ## GitHub Pages
 

@@ -5,7 +5,8 @@ import {
   applyTimeChange,
   createQuestion,
   filterPokemon,
-  getSpriteCandidates,
+  getSpriteKey,
+  getSpritePath,
   getTimeChange,
 } from "../src/game.mjs";
 
@@ -69,11 +70,12 @@ test("time adjustments never exceed the cap or fall below zero", () => {
   assert.equal(applyTimeChange(10, 2.5), 12.5);
 });
 
-test("sprite fallbacks follow the requested game order", () => {
-  assert.deepEqual(getSpriteCandidates(25).map((url) => url.split("/").slice(-2).join("/")), [
-    "champions/25.webp",
-    "legends-za/25.webp",
-    "scarlet-violet/25.webp",
-    "legends-arceus/25.webp",
+test("sprite paths use the form-specific local asset mapping", () => {
+  const sprites = new Map([
+    [getSpriteKey({ no: 25, name: "ピカチュウ", form: "" }), 25],
+    [getSpriteKey({ no: 25, name: "ピカチュウ", form: "アローラのすがた" }), 10091],
   ]);
+  assert.equal(getSpritePath({ no: 25, name: "ピカチュウ", form: "" }, sprites), "./assets/pokemon/25.png");
+  assert.equal(getSpritePath({ no: 25, name: "ピカチュウ", form: "アローラのすがた" }, sprites), "./assets/pokemon/10091.png");
+  assert.throws(() => getSpritePath({ no: 25, name: "ピカチュウ", form: "別のすがた" }, sprites), RangeError);
 });

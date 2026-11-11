@@ -448,12 +448,6 @@ p {
   user-select: none;
 }
 
-.pokemon-image.image-unavailable {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-
 .pokemon-name {
   display: block;
   width: 100%;
