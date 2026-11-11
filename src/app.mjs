@@ -2,6 +2,8 @@ import {
   STARTING_TIME,
   applyTimeChange,
   createQuestion,
+  decodeSharedResult,
+  encodeSharedResult,
   filterPokemon,
   getSpriteKey,
   getSpritePath,
@@ -32,6 +34,7 @@ let nextQuestionPromise;
 const spriteCache = new Map();
 let history = [];
 let score = 0;
+let resultMode = { finalOnly: true, regulationOnly: true };
 let timeLeft = STARTING_TIME;
 let lastFrame = 0;
 let animationFrame = 0;
@@ -57,10 +60,32 @@ async function loadData() {
       spriteManifest.map((pokemon) => [getSpriteKey(pokemon), pokemon.spriteId]),
     );
     refreshPoolSummary();
+    loadSharedResult();
   } catch (error) {
     byId("load-error").textContent = `データの読み込みに失敗しました。ページを再読み込みしてください。(${error.message})`;
     byId("load-error").hidden = false;
     byId("pool-summary").textContent = "出題データを読み込めませんでした";
+  }
+}
+
+function loadSharedResult() {
+  const code = new URLSearchParams(window.location.search).get("result");
+  if (!code) return;
+
+  try {
+    const shared = decodeSharedResult(code, pokemonData);
+    resultMode = {
+      finalOnly: shared.finalOnly,
+      regulationOnly: shared.regulationOnly,
+    };
+    finalOnlyInput.checked = resultMode.finalOnly;
+    regulationOnlyInput.checked = resultMode.regulationOnly;
+    history = shared.history;
+    score = shared.score;
+    showResult();
+  } catch (error) {
+    byId("load-error").textContent = `共有された結果を読み込めませんでした。(${error.message})`;
+    byId("load-error").hidden = false;
   }
 }
 
@@ -102,6 +127,10 @@ async function startGame() {
   startButton.disabled = true;
   startButton.querySelector("span").textContent = "画像を準備中…";
   pool = getCurrentPool();
+  resultMode = {
+    finalOnly: finalOnlyInput.checked,
+    regulationOnly: regulationOnlyInput.checked,
+  };
   const firstQuestion = createQuestion(pool);
 
   try {
@@ -181,7 +210,7 @@ function preloadQuestionImages(pair) {
 }
 
 function preloadNextQuestion() {
-  const pair = createQuestion(pool);
+  const pair = createQuestion(pool, Math.random, history.length);
   return preloadQuestionImages(pair).then(() => pair).catch((error) => {
     byId("load-error").textContent = `画像の読み込みに失敗しました。(${error.message})`;
     byId("load-error").hidden = false;
@@ -277,9 +306,17 @@ function endGame() {
   if (!gameActive) return;
   gameActive = false;
   cancelAnimationFrame(animationFrame);
+  showResult();
+}
+
+function showResult() {
   setScreen("result");
   byId("final-score").textContent = String(score);
-  byId("result-detail").textContent = `${history.length}問中 ${score}問正解　・　正解率 ${history.length ? Math.round((score / history.length) * 100) : 0}%`;
+  const modes = [];
+  if (resultMode.finalOnly) modes.push("最終進化のみ");
+  if (resultMode.regulationOnly) modes.push("レギュレーションM-C");
+  const modeLabel = modes.length ? modes.join("・") : "全ポケモン";
+  byId("result-detail").textContent = `${modeLabel}　・　${history.length}問中 ${score}問正解　・　正解率 ${history.length ? Math.round((score / history.length) * 100) : 0}%`;
   renderHistory();
 }
 
@@ -326,12 +363,15 @@ function renderHistory() {
 async function shareResult() {
   const attempts = history.length;
   const accuracy = attempts ? Math.round((score / attempts) * 100) : 0;
-  const shareText = `ポケスピ！で ${attempts}問中${score}問正解（正解率${accuracy}%）⚡\nあなたも挑戦！ ${window.location.href}`;
   const status = byId("share-status");
 
   try {
+    const code = encodeSharedResult({ ...resultMode, history }, pokemonData);
+    const resultUrl = new URL(window.location.href);
+    resultUrl.searchParams.set("result", code);
+    const shareText = `ポケスピ！で ${attempts}問中${score}問正解（正解率${accuracy}%）⚡\n結果を見る・挑戦する ${resultUrl.href}`;
     if (navigator.share) {
-      await navigator.share({ title: "ポケスピ！", text: shareText });
+      await navigator.share({ title: "ポケスピ！", text: shareText, url: resultUrl.href });
       status.textContent = "共有画面を開きました！";
     } else if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareText);

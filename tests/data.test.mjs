@@ -29,12 +29,28 @@ test("the default filters provide enough distinct-speed questions", () => {
     { finalOnly: true, regulationOnly: true },
     regulationIds,
   );
-  assert.equal(pool.length, 244);
-  assert.equal(new Set(pool.map((entry) => entry.stats.speed)).size, 81);
+  assert.equal(pool.length, 286);
+  assert.equal(new Set(pool.map((entry) => entry.stats.speed)).size, 85);
   for (let index = 0; index < 500; index += 1) {
     const [left, right] = createQuestion(pool);
     assert.notEqual(left.stats.speed, right.stats.speed);
   }
+});
+
+test("all bundled forms and mega evolutions are included when filters are off", () => {
+  const allPokemon = filterPokemon(
+    pokemon,
+    { finalOnly: false, regulationOnly: false },
+  );
+  assert.deepEqual(allPokemon, pokemon);
+  assert.equal(allPokemon.filter((entry) => entry.isMegaEvolution).length, 51);
+  assert.equal(allPokemon.filter((entry) => entry.form).length, 78);
+
+  const finalFormsAndMegas = filterPokemon(
+    pokemon,
+    { finalOnly: true, regulationOnly: false },
+  );
+  assert.equal(finalFormsAndMegas.filter((entry) => entry.isMegaEvolution).length, 51);
 });
 
 test("every bundled Pokémon has a valid local PNG sprite", async () => {
