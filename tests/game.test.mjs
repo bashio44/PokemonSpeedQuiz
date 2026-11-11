@@ -71,13 +71,14 @@ test("question creation reports pools that cannot make a valid pair", () => {
 });
 
 test("correct bonuses shrink to a sustainable floor and incorrect penalties are capped", () => {
-  assert.equal(getTimeChange(0, true), 2.5);
-  assert.equal(getTimeChange(1, true), 2.4);
-  assert.equal(getTimeChange(20, true), 0.8);
+  assert.equal(getTimeChange(0, true), 5);
+  assert.equal(getTimeChange(1, true), 4.9);
+  assert.equal(getTimeChange(33, true), 1);
+  assert.equal(getTimeChange(20, true), 2.6);
   assert.equal(getTimeChange(0, false), -1.5);
   assert.equal(getTimeChange(1, false), -1.9);
   assert.equal(getTimeChange(100, false), -8);
-  assert.equal(getTimeChange(Number.MAX_SAFE_INTEGER, true), 0.8);
+  assert.equal(getTimeChange(Number.MAX_SAFE_INTEGER, true), 1);
 });
 
 test("a very long perfect streak keeps time arithmetic finite and bounded", () => {
@@ -120,9 +121,9 @@ test("question pairs get progressively closer in relative speed", () => {
 });
 
 test("time adjustments never exceed the cap or fall below zero", () => {
-  assert.equal(applyTimeChange(29, 2.5), STARTING_TIME);
+  assert.equal(applyTimeChange(29, 5), STARTING_TIME);
   assert.equal(applyTimeChange(5, -10), 0);
-  assert.equal(applyTimeChange(10, 2.5), 12.5);
+  assert.equal(applyTimeChange(10, 5), 15);
 });
 
 test("sprite paths use the form-specific local asset mapping", () => {
@@ -160,4 +161,34 @@ test("shared result links restore history, score, and the selected mode", () => 
     ],
   );
   assert.throws(() => decodeSharedResult("not-valid!", sample), TypeError);
+});
+
+test("compact shared results are smaller and legacy links remain readable", () => {
+  const history = Array.from({ length: 20 }, (_, index) => ({
+    left: sample[0],
+    right: sample[1],
+    selectedSide: index % 2 ? "right" : "left",
+  }));
+  const code = encodeSharedResult({ finalOnly: true, regulationOnly: false, history }, sample);
+  const legacyCode = btoa(JSON.stringify([
+    1,
+    1,
+    history.map((answer) => [
+      sample.indexOf(answer.left),
+      sample.indexOf(answer.right),
+      answer.selectedSide === "right" ? 1 : 0,
+    ]),
+  ])).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  assert.ok(code.length < legacyCode.length);
+  assert.equal(decodeSharedResult(code, sample).history.length, history.length);
+  assert.equal(decodeSharedResult(legacyCode, sample).history.length, history.length);
+});
+
+test("compact shared results reject truncated and malformed payloads", () => {
+  const code = encodeSharedResult({
+    finalOnly: false,
+    regulationOnly: false,
+    history: [{ left: sample[0], right: sample[1], selectedSide: "left" }],
+  }, sample);
+  assert.throws(() => decodeSharedResult(code.slice(0, -2), sample), TypeError);
 });
